@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dynamic PERT-CPM Analyzer</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+    <!-- Fixed Left Sidebar -->
+    <aside id="sidebar" class="sidebar animate-fade">
+        <div class="sidebar-widget sidebar-logo-widget">
+            <img src="/logo.png" alt="Zagazig University Logo">
+        </div>
+
+        <div class="sidebar-widget">
+            <span class="widget-icon">🕒</span>
+            <div class="widget-content">
+                <span id="widget-time" class="widget-time">10:54 AM</span>
+            </div>
+        </div>
+
+        <div class="sidebar-widget">
+            <span class="widget-icon">📅</span>
+            <div class="widget-content">
+                <span id="widget-date" class="widget-date">19th May 2026</span>
+                <span id="widget-day" class="widget-day">Tuesday</span>
+            </div>
+        </div>
+
+        <div class="sidebar-widget">
+            <span class="widget-icon" id="widget-weather-icon">☀️</span>
+            <div class="widget-content">
+                <span id="widget-temp" class="widget-temp">19, sunny</span>
+                <span id="widget-location" class="widget-location">Zagazig</span>
+            </div>
+        </div>
+
+        <div class="sidebar-footer">
+            Zagazig University
+        </div>
+    </aside>
+
+    <div class="container">
+        <header>
+            <div class="header-controls">
+                <button id="open-analysis-btn" class="btn btn-secondary">
+                    <span>📄</span> System Analysis
+                </button>
+
+                <div class="theme-picker-container">
+                    <div class="theme-buttons">
+                        <button class="theme-btn active" data-theme="dark-slate" title="Midnight Slate">
+                            <span class="color-dots">
+                                <span class="dot" style="background: #0f172a"></span>
+                                <span class="dot" style="background: #38bdf8"></span>
+                                <span class="dot" style="background: #f43f5e"></span>
+                            </span>
+                            <span class="theme-name">Slate</span>
+                        </button>
+                        <button class="theme-btn" data-theme="dark-neon" title="Cyberpunk Neon">
+                            <span class="color-dots">
+                                <span class="dot" style="background: #050508"></span>
+                                <span class="dot" style="background: #10b981"></span>
+                                <span class="dot" style="background: #ec4899"></span>
+                            </span>
+                            <span class="theme-name">Neon</span>
+                        </button>
+                        <button class="theme-btn" data-theme="light-nordic" title="Nordic Snow">
+                            <span class="color-dots">
+                                <span class="dot" style="background: #f8fafc"></span>
+                                <span class="dot" style="background: #0284c7"></span>
+                                <span class="dot" style="background: #ef4444"></span>
+                            </span>
+                            <span class="theme-name">Nordic</span>
+                        </button>
+                        <button class="theme-btn" data-theme="light-sunset" title="Emerald Garden">
+                            <span class="color-dots">
+                                <span class="dot" style="background: #bbf7d0"></span>
+                                <span class="dot" style="background: #15803d"></span>
+                                <span class="dot" style="background: #f0fdf4"></span>
+                            </span>
+                            <span class="theme-name">Emerald</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <h1>PERT-CPM Dynamic Solver</h1>
+            <p style="color: var(--text-secondary);">Perform critical path analysis and project scheduling with ease.
+            </p>
+        </header>
+
+        <div id="error-box" class="error-message"></div>
+
+        <section class="glass-card">
+            <div class="input-section">
+                <div id="activity-container">
+                    <!-- Dynamic rows will appear here -->
+                </div>
+
+                <div class="controls">
+                    <button id="add-activity" class="btn btn-secondary">
+                        <span>+</span> Add Activity
+                    </button>
+                    <button id="load-sample" class="btn btn-secondary">
+                        <span>📋</span> Load Standard Data
+                    </button>
+                    <button id="load-complex" class="btn btn-secondary">
+                        <span>📊</span> Load Complex Data
+                    </button>
+                    <button id="solve-btn" class="btn btn-primary" style="margin-left: auto;">
+                        <span>🚀</span> Run Analysis
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="results-section" class="results-container animate-fade">
+            <div class="summary-stats">
+                <div class="stat-card">
+                    <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase;">Project
+                        Duration</span>
+                    <span id="total-duration" class="stat-value">0</span>
+                </div>
+                <div class="stat-card">
+                    <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase;">Critical
+                        Path</span>
+                    <span id="critical-path-list" class="stat-value" style="font-size: 1.2rem;">-</span>
+                </div>
+            </div>
+
+            <div class="glass-card">
+                <h3>Calculation Results</h3>
+                <div class="table-wrapper">
+                    <table id="results-table">
+                        <thead>
+                            <tr>
+                                <th>Activity</th>
+                                <th>TE</th>
+                                <th>ES</th>
+                                <th>EF</th>
+                                <th>LS</th>
+                                <th>LF</th>
+                                <th>TF</th>
+                                <th>FF</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-body"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="glass-card gantt-display" id="gantt-card">
+                <h3>Gantt Chart (Timeline View)</h3>
+                <div class="gantt-scroll-container">
+                    <div id="gantt-chart-container" class="gantt-chart-container"></div>
+                </div>
+            </div>
+
+            <div class="glass-card graph-display">
+                <h3>Dependency Graph</h3>
+                <div id="graph-container">
+                    <img id="graph-img" src="" alt="Network Diagram">
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- System Analysis Modal -->
+    <div id="analysis-modal" class="modal">
+        <div class="modal-content animate-fade">
+            <div class="modal-header">
+                <h2>System Analysis Report</h2>
+                <button id="close-modal-btn" class="close-btn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="modal-sidebar">
+                    <button class="tab-btn active" data-tab="arch">💻 Architecture</button>
+                    <button class="tab-btn" data-tab="math">📐 Scheduling Math</button>
+                    <button class="tab-btn" data-tab="ux">🎨 UI/UX & Themes</button>
+                    <button class="tab-btn" data-tab="gaps">⚠️ Technical Gaps</button>
+                    <button class="tab-btn" data-tab="roadmap">🚀 Roadmap</button>
+                    <button class="tab-btn" data-tab="dev">👤 Developer Profile</button>
+                </div>
+                <div class="modal-main">
+                    <!-- Tab: Architecture -->
+                    <div id="tab-arch" class="tab-content active">
+                        <h3>System Architecture & Technology Stack</h3>
+                        <p>The PERT-CPM Solver is structured as a lightweight full-stack Python web application running
+                            on a Flask web server, with graph theory logic computed asynchronously via NetworkX and data
+                            visualizations rendered on the fly with Matplotlib.</p>
+
+                        <div class="highlight-box">
+                            <strong>Backend Technologies:</strong>
+                            <ul>
+                                <li><strong>Flask:</strong> Serves routes and exposes the <code>/solve</code> POST API
+                                    endpoint.</li>
+                                <li><strong>NetworkX:</strong> Constructs Directed Acyclic Graphs (DAGs), performs
+                                    topological sorting, cycle detection, predecessor mapping, and successor lookup.
+                                </li>
+                                <li><strong>Matplotlib & NumPy:</strong> Generates sequence flow diagrams using headless
+                                    layout rendering (<code>matplotlib.use('Agg')</code>).</li>
+                            </ul>
+                        </div>
+
+                        <div class="highlight-box">
+                            <strong>Frontend Technologies:</strong>
+                            <ul>
+                                <li><strong>HTML5 / Vanilla CSS3:</strong> Built on semantic structures and modern CSS
+                                    custom variables (CSS variables) supporting on-the-fly theme switching.</li>
+                                <li><strong>Asynchronous Javascript:</strong> Collects row entries, performs local
+                                    validation, posts JSON payloads, and handles DOM manipulation for stats, results,
+                                    and network graphics.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Math -->
+                    <div id="tab-math" class="tab-content">
+                        <h3>Core Scheduling & Mathematical Formulations</h3>
+                        <p>The solver utilizes standard Critical Path Method (CPM) and PERT calculations for
+                            backward/forward passes on project nodes:</p>
+
+                        <ul>
+                            <li>
+                                <strong>Expected Duration ($T_E$):</strong> Probabilistic activity duration from
+                                optimistic ($a$), most likely ($m$), and pessimistic ($b$) times.
+                                <br><span class="math-formula">TE = (a + 4m + b) / 6</span>
+                            </li>
+                            <li>
+                                <strong>Early Start ($ES$):</strong> The earliest time an activity can begin.
+                                <br><span class="math-formula">ES(i) = max( EF(p) ) for all predecessors p</span>
+                            </li>
+                            <li>
+                                <strong>Early Finish ($EF$):</strong> The earliest time an activity can complete.
+                                <br><span class="math-formula">EF(i) = ES(i) + TE(i)</span>
+                            </li>
+                            <li>
+                                <strong>Late Finish ($LF$):</strong> The latest time an activity can finish without
+                                delaying the project.
+                                <br><span class="math-formula">LF(i) = min( LS(s) ) for all successors s</span>
+                            </li>
+                            <li>
+                                <strong>Late Start ($LS$):</strong> The latest time an activity can start without
+                                delaying the project.
+                                <br><span class="math-formula">LS(i) = LF(i) - TE(i)</span>
+                            </li>
+                            <li>
+                                <strong>Total Float ($TF$):</strong> The buffer time available before project delay.
+                                <br><span class="math-formula">TF(i) = LF(i) - EF(i) = LS(i) - ES(i)</span>
+                            </li>
+                            <li>
+                                <strong>Free Float ($FF$):</strong> The buffer time available without delaying any
+                                successor start.
+                                <br><span class="math-formula">FF(i) = min( ES(s) ) - EF(i)</span>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Tab: UI/UX & Themes -->
+                    <div id="tab-ux" class="tab-content">
+                        <h3>UI/UX & Design Architecture</h3>
+                        <p>The application is styled with a premium glassmorphism command-center aesthetic, featuring
+                            dynamic styling variations across both themes and panels.</p>
+
+                        <div class="highlight-box">
+                            <strong>Aesthetic Elements:</strong>
+                            <ul>
+                                <li><strong>Theme Variations:</strong> Midnight Slate (default), Cyberpunk Neon, Nordic
+                                    Snow (light), and Warm Sunset (light).</li>
+                                <li><strong>Dynamic Collapsible Sidebar:</strong> An overlay drawer that starts
+                                    collapsed to prioritize workspace width. Clicking the toggle pulls out a gorgeous
+                                    metallic panel.</li>
+                                <li><strong>Theme-Synced Sidebar CSS Variables:</strong> The sidebar background,
+                                    margins, widget cards, and buttons transition dynamically in real-time between
+                                    Slate, Neon, Nordic, and Sunset colors.</li>
+                                <li><strong>Live Location & Weather Integration:</strong> Integrated with standard HTML5
+                                    Geolocation API, reverse-geocoded dynamically via OpenStreetMap Nominatim, and
+                                    updated in real-time using live WMO codes from Open-Meteo.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Gaps -->
+                    <div id="tab-gaps" class="tab-content">
+                        <h3>Critical Gaps & Probabilistic Capabilities</h3>
+                        <p>The application currently focuses on the expected durations ($T_E$) and critical paths, but
+                            lacks the core probabilistic analytics that PERT is built for:</p>
+
+                        <div class="highlight-box" style="border-left-color: var(--critical-color);">
+                            <strong>Missing Analytic Elements:</strong>
+                            <ul>
+                                <li><strong>Activity Variance ($\sigma^2$):</strong> $\sigma^2 = ((b - a) / 6)^2$</li>
+                                <li><strong>Project Standard Deviation ($\sigma_P$):</strong> Calculated as the square
+                                    root of the sum of variances of activities along the critical path.</li>
+                                <li><strong>Completion Probability:</strong> An interface requesting target completion
+                                    dates ($D$) to compute the normal-curve Z-score probability $P(T \le D)$.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Tab: Roadmap -->
+                    <div id="tab-roadmap" class="tab-content">
+                        <h3>Systems Roadmap</h3>
+                        <ul>
+                            <li>
+                                <strong>Phase 1: Input contrast adjustment (Completed)</strong>
+                                <br>Implemented custom placeholder rules to prevent opacity contrast collision.
+                            </li>
+                            <li>
+                                <strong>Phase 2: Light/Dark Theme expansion (Completed)</strong>
+                                <br>Created 4 different visual mods (2 dark, 2 light) and synchronized server-side chart
+                                rendering.
+                            </li>
+                            <li>
+                                <strong>Phase 3: Interactive documentation (Completed)</strong>
+                                <br>Replaced system analysis Markdown files with an interactive sidebar modal window.
+                            </li>
+                            <li>
+                                <strong>Phase 4: Collapsible Geolocation Drawer & Weather Integration
+                                    (Completed)</strong>
+                                <br>Engineered collapsible slide drawer with responsive CSS variables, reverse-geocoded
+                                HTML5 GPS tracking, and day/night conditional weather via Open-Meteo.
+                            </li>
+                            <li>
+                                <strong>Phase 5: Probabilistic PERT Solver</strong>
+                                <br>Build variance calculations and target date completion gauges.
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- Tab: Developer -->
+                    <div id="tab-dev" class="tab-content">
+                        <h3>Developer & Academic Profile</h3>
+                        <p>This Decision Support System (DSS) was designed and implemented as part of academic research
+                            and course requirements in operations research and project scheduling optimization.</p>
+
+                        <div class="developer-card">
+                            <div class="profile-avatar">MA</div>
+                            <div class="profile-info">
+                                <h4>Mohamed Ayman Hamid Mahdi</h4>
+                                <p class="profile-role">Lead System Architect & Developer</p>
+                                <ul class="profile-details">
+                                    <li><strong>Grade:</strong> Grade 4</li>
+                                    <li><strong>Department:</strong> Decision Support Department</li>
+                                    <li><strong>Faculty:</strong> Faculty of Computers and Informatics</li>
+                                    <li><strong>University:</strong> Zagazig University</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+
+</html>
