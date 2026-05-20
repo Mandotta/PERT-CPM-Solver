@@ -256,14 +256,16 @@ def calculate_cpm(activities):
         else:
             data['ff'] = round(min(node_data[s]['es'] for s in successors) - data['ef'], 2)
 
-    critical_nodes = {name for name, d in node_data.items() if d['tf'] == 0}
+    critical_path = [name for name in topo_order if node_data[name]['tf'] == 0]
+    critical_nodes_set = set(critical_path)
+    
     critical_chain = []
-    if critical_nodes:
-        starts = [n for n in critical_nodes if not any(p in critical_nodes for p in G.predecessors(n))]
-        curr = min(starts, key=lambda n: node_data[n]['es']) if starts else list(critical_nodes)[0]
+    if critical_path:
+        starts = [n for n in critical_path if not any(p in critical_nodes_set for p in G.predecessors(n))]
+        curr = min(starts, key=lambda n: node_data[n]['es']) if starts else critical_path[0]
         critical_chain.append(curr)
         while True:
-            succs = [s for s in G.successors(curr) if s in critical_nodes]
+            succs = [s for s in G.successors(curr) if s in critical_nodes_set]
             if not succs: break
             curr = min(succs, key=lambda s: abs(node_data[s]['es'] - node_data[curr]['ef']))
             critical_chain.append(curr)
@@ -271,7 +273,6 @@ def calculate_cpm(activities):
     project_variance = sum(node_data[n]['var'] for n in critical_chain)
     project_std = round(project_variance ** 0.5, 4)
 
-    critical_path = list(critical_nodes)
     
     return list(node_data.values()), critical_path, project_duration, G, project_std
 
