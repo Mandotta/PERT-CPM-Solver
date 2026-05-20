@@ -370,7 +370,7 @@ document.addEventListener('DOMContentLoaded', () => {
             96: { text: "thunderstorm", icon: "⛈️" },
             99: { text: "thunderstorm", icon: "⛈️" }
         };
-        return mapping[code] || { text: isDay ? "clear" : "clear night", icon: isDay ? "☀️" : "🌙" };
+        return mapping[code] || { text: "unknown conditions", icon: "❓" };
     }
 
     async function updateWeather() {
@@ -379,67 +379,63 @@ document.addEventListener('DOMContentLoaded', () => {
         const locationEl = document.getElementById('widget-location');
         if (!tempEl) return;
 
-        // Default coordinates: Zagazig, Egypt
-        const fallbackLat = 30.5872;
-        const fallbackLon = 31.5020;
-        const fallbackName = "Zagazig";
-
-        const fetchWeather = async (latitude, longitude, name) => {
-            try {
-                const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,weather_code,is_day`);
-                const data = await res.json();
-                if (data && data.current) {
-                    const temp = Math.round(data.current.temperature_2m);
-                    const wmo = data.current.weather_code;
-                    const isDay = data.current.is_day === 1;
-                    const info = getWmoWeather(wmo, isDay);
-                    
-                    tempEl.innerText = `${temp}°C, ${info.text}`;
-                    if (iconEl) iconEl.innerText = info.icon;
-                    if (locationEl) locationEl.innerText = name;
-                }
-            } catch (e) {
-                console.error("Error fetching weather data:", e);
-                const currentHour = new Date().getHours();
-                const fallbackIsDay = currentHour >= 6 && currentHour < 18;
-                tempEl.innerText = fallbackIsDay ? "19°C, sunny" : "19°C, clear night";
-                if (iconEl) iconEl.innerText = fallbackIsDay ? "☀️" : "🌙";
-                if (locationEl) locationEl.innerText = name;
-            }
+        const showWeatherError = () => {
+            tempEl.innerText = "Unable to load weather data";
+            if (iconEl) iconEl.innerText = "⚠️";
+            if (locationEl) locationEl.innerText = "";
         };
 
-        // Try to get automatic coordinates via HTML5 Geolocation API
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(
-                async (position) => {
-                    const autoLat = position.coords.latitude.toFixed(4);
-                    const autoLon = position.coords.longitude.toFixed(4);
-                    
-                    let geoName = "My Location";
-                    try {
-                        const geoRes = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${autoLat}&lon=${autoLon}&zoom=10`, {
-                            headers: { 'Accept-Language': 'en' }
-                        });
-                        const geoData = await geoRes.json();
-                        if (geoData && geoData.address) {
-                            geoName = geoData.address.city || geoData.address.town || geoData.address.village || geoData.address.suburb || geoData.address.county || geoData.address.state || "My Location";
-                        }
-                    } catch (err) {
-                        console.warn("Reverse-geocoding failed, using generic label.", err);
-                    }
-                    
-                    fetchWeather(autoLat, autoLon, geoName);
-                },
-                () => {
-                    // Fallback to Zagazig if user denies permission or error occurs
-                    fetchWeather(fallbackLat, fallbackLon, fallbackName);
-                },
-                { timeout: 5000 }
-            );
-        } else {
-            // Geolocation not supported, fallback to Zagazig
-            fetchWeather(fallbackLat, fallbackLon, fallbackName);
+        const applyWeather = (data, name) => {
+            if (!data?.ok || !Number.isFinite(data.temperature)) {
+                showWeatherError();
+                return;
+            }
+            const temp = Math.round(data.temperature);
+            const description = data.description || getWmoWeather(0, true).text;
+            const icon = data.icon || "❓";
+            tempEl.innerText = `${temp}°C, ${description}`;
+            if (iconEl) iconEl.innerText = icon;
+            if (locationEl) locationEl.innerText = name || "";
+        };
+
+        if (!navigator.geolocation) {
+            showWeatherError();
+            return;
         }
+
+        navigator.geolocation.getCurrentPosition(
+            async (position) => {
+                const autoLat = position.coords.latitude;
+                const autoLon = position.coords.longitude;
+                const params = new URLSearchParams({
+                    lat: String(autoLat),
+                    lon: String(autoLon),
+                });
+
+                try {
+                    const [geoData, weatherRes] = await Promise.all([
+                        fetch(`/api/geocode?${params}`)
+                            .then((res) => res.json())
+                            .catch((err) => {
+                                console.warn("Reverse-geocoding failed.", err);
+                                return { ok: false, name: "" };
+                            }),
+                        fetch(`/api/weather?${params}`),
+                    ]);
+                    const weatherData = await weatherRes.json();
+                    const geoName = geoData.ok ? geoData.name : "";
+                    applyWeather(weatherData, geoName);
+                } catch (e) {
+                    console.error("Error fetching weather data:", e);
+                    showWeatherError();
+                }
+            },
+            (err) => {
+                console.warn("Geolocation unavailable:", err);
+                showWeatherError();
+            },
+            { timeout: 10000, enableHighAccuracy: false }
+        );
     }
 
     function updateWidgets() {

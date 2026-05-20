@@ -1,6 +1,10 @@
 import os
 import io
+import json
 import base64
+from urllib import request as urlrequest
+from urllib import parse as urlparse
+from urllib.error import URLError
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import networkx as nx
 import matplotlib
@@ -9,6 +13,178 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 app = Flask(__name__)
+
+WEATHER_USER_AGENT = "CPM-PERT-Analyzer/1.0 (Zagazig University academic project)"
+
+
+def get_wmo_info(code, is_day):
+    mapping = {
+        0: {"text": "sunny" if is_day else "clear night", "icon": "☀️" if is_day else "🌙"},
+        1: {"text": "mainly clear" if is_day else "clear night", "icon": "🌤️" if is_day else "🌙"},
+        2: {"text": "partly cloudy", "icon": "⛅" if is_day else "☁️"},
+        3: {"text": "overcast", "icon": "☁️"},
+        45: {"text": "foggy", "icon": "🌫️"},
+        48: {"text": "foggy", "icon": "🌫️"},
+        51: {"text": "light drizzle", "icon": "🌧️"},
+        53: {"text": "drizzle", "icon": "🌧️"},
+        55: {"text": "dense drizzle", "icon": "🌧️"},
+        61: {"text": "slight rain", "icon": "🌧️"},
+        63: {"text": "moderate rain", "icon": "🌧️"},
+        65: {"text": "heavy rain", "icon": "🌧️"},
+        71: {"text": "slight snow", "icon": "❄️"},
+        73: {"text": "moderate snow", "icon": "❄️"},
+        75: {"text": "heavy snow", "icon": "❄️"},
+        77: {"text": "snow grains", "icon": "❄️"},
+        80: {"text": "slight showers", "icon": "🌧️"},
+        81: {"text": "showers", "icon": "🌧️"},
+        82: {"text": "heavy showers", "icon": "🌧️"},
+        95: {"text": "thunderstorm", "icon": "⛈️"},
+        96: {"text": "thunderstorm", "icon": "⛈️"},
+        99: {"text": "thunderstorm", "icon": "⛈️"},
+    }
+    return mapping.get(code, {"text": "unknown conditions", "icon": "❓"})
+
+
+def _http_get_json(url, timeout=12):
+    req = urlrequest.Request(url, headers={"User-Agent": WEATHER_USER_AGENT})
+    with urlrequest.urlopen(req, timeout=timeout) as resp:
+        return json.loads(resp.read().decode("utf-8"))
+
+
+def _is_day_from_observation(obs_time):
+    if not obs_time:
+        return True
+    parts = obs_time.strip().upper().split()
+    if len(parts) < 2:
+        return True
+    hour = int(parts[0].split(":")[0])
+    if parts[1] == "PM" and hour != 12:
+        hour += 12
+    if parts[1] == "AM" and hour == 12:
+        hour = 0
+    return 6 <= hour < 18
+
+
+def _wttr_info(weather_code, is_day):
+    wttr_map = {
+        113: ("sunny", "☀️"),
+        116: ("partly cloudy", "⛅"),
+        119: ("cloudy", "☁️"),
+        122: ("overcast", "☁️"),
+        143: ("mist", "🌫️"),
+        176: ("patchy rain", "🌧️"),
+        179: ("patchy snow", "❄️"),
+        182: ("sleet", "🌧️"),
+        185: ("freezing drizzle", "🌧️"),
+        200: ("thunderstorm", "⛈️"),
+        227: ("blowing snow", "❄️"),
+        230: ("blizzard", "❄️"),
+        248: ("fog", "🌫️"),
+        260: ("fog", "🌫️"),
+        263: ("light drizzle", "🌧️"),
+        266: ("drizzle", "🌧️"),
+        281: ("freezing drizzle", "🌧️"),
+        284: ("heavy freezing drizzle", "🌧️"),
+        293: ("light rain", "🌧️"),
+        296: ("light rain", "🌧️"),
+        299: ("moderate rain", "🌧️"),
+        302: ("heavy rain", "🌧️"),
+        308: ("heavy rain", "🌧️"),
+        311: ("light freezing rain", "🌧️"),
+        314: ("freezing rain", "🌧️"),
+        317: ("light sleet", "🌧️"),
+        320: ("sleet", "🌧️"),
+        323: ("light snow", "❄️"),
+        326: ("light snow", "❄️"),
+        329: ("heavy snow", "❄️"),
+        332: ("heavy snow", "❄️"),
+        335: ("blowing snow", "❄️"),
+        338: ("heavy snow", "❄️"),
+        350: ("ice pellets", "🌧️"),
+        353: ("light showers", "🌧️"),
+        356: ("showers", "🌧️"),
+        359: ("heavy showers", "🌧️"),
+        362: ("light sleet showers", "🌧️"),
+        365: ("sleet showers", "🌧️"),
+        368: ("light snow showers", "❄️"),
+        371: ("snow showers", "❄️"),
+        374: ("light ice pellet showers", "🌧️"),
+        377: ("ice pellet showers", "🌧️"),
+        386: ("patchy thunder", "⛈️"),
+        389: ("thunderstorm", "⛈️"),
+        392: ("thunder with snow", "⛈️"),
+        395: ("heavy snow", "❄️"),
+    }
+    text, icon = wttr_map.get(weather_code, ("unknown conditions", "❓"))
+    if weather_code == 113 and not is_day:
+        return {"text": "clear night", "icon": "🌙"}
+    return {"text": text, "icon": icon}
+
+
+def fetch_weather_open_meteo(lat, lon):
+    query = urlparse.urlencode({
+        "latitude": lat,
+        "longitude": lon,
+        "current": "temperature_2m,weather_code,is_day",
+    })
+    url = f"https://api.open-meteo.com/v1/forecast?{query}"
+    data = _http_get_json(url)
+    current = data.get("current") or {}
+    temp = current.get("temperature_2m")
+    if temp is None or current.get("weather_code") is None:
+        return None
+    is_day = current.get("is_day", 1) == 1
+    info = get_wmo_info(int(current["weather_code"]), is_day)
+    return {
+        "temperature": float(temp),
+        "description": info["text"],
+        "icon": info["icon"],
+    }
+
+
+def fetch_weather_wttr(lat, lon):
+    url = f"https://wttr.in/{lat},{lon}?format=j1"
+    data = _http_get_json(url)
+    conditions = data.get("current_condition") or []
+    if not conditions:
+        return None
+    current = conditions[0]
+    temp = current.get("temp_C")
+    if temp is None:
+        return None
+    is_day = _is_day_from_observation(current.get("observation_time", ""))
+    weather_code = int(current.get("weatherCode", 113))
+    desc_list = current.get("weatherDesc") or []
+    info = _wttr_info(weather_code, is_day)
+    if desc_list and desc_list[0].get("value"):
+        info = {**info, "text": desc_list[0]["value"].strip().lower()}
+    return {
+        "temperature": float(temp),
+        "description": info["text"],
+        "icon": info["icon"],
+    }
+
+
+def fetch_location_name(lat, lon):
+    query = urlparse.urlencode({
+        "format": "json",
+        "lat": lat,
+        "lon": lon,
+        "zoom": 10,
+    })
+    url = f"https://nominatim.openstreetmap.org/reverse?{query}"
+    data = _http_get_json(url)
+    address = data.get("address") or {}
+    return (
+        address.get("city")
+        or address.get("town")
+        or address.get("village")
+        or address.get("suburb")
+        or address.get("county")
+        or address.get("state")
+        or ""
+    )
+
 
 def calculate_cpm(activities):
     # activities: list of dicts {name, pred, a, m, b}
@@ -230,6 +406,42 @@ def generate_graph_base64(G, node_data, critical_path, theme='dark-slate'):
     img_str = base64.b64encode(buf.read()).decode('utf-8')
     plt.close()
     return img_str
+
+@app.route('/api/weather')
+def api_weather():
+    lat = request.args.get('lat', type=float)
+    lon = request.args.get('lon', type=float)
+    if lat is None or lon is None:
+        return jsonify({'ok': False, 'error': 'lat and lon are required'}), 400
+
+    payload = None
+    for provider in (fetch_weather_open_meteo, fetch_weather_wttr):
+        try:
+            payload = provider(lat, lon)
+            if payload:
+                break
+        except (URLError, TimeoutError, ValueError, json.JSONDecodeError, KeyError):
+            continue
+
+    if not payload:
+        return jsonify({'ok': False, 'error': 'Unable to fetch weather'}), 502
+
+    return jsonify({'ok': True, **payload})
+
+
+@app.route('/api/geocode')
+def api_geocode():
+    lat = request.args.get('lat', type=float)
+    lon = request.args.get('lon', type=float)
+    if lat is None or lon is None:
+        return jsonify({'ok': False, 'error': 'lat and lon are required'}), 400
+
+    try:
+        name = fetch_location_name(lat, lon)
+        return jsonify({'ok': True, 'name': name})
+    except (URLError, TimeoutError, ValueError, json.JSONDecodeError, KeyError):
+        return jsonify({'ok': False, 'name': ''})
+
 
 @app.route('/')
 def index():
