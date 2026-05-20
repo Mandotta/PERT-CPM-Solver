@@ -1070,3 +1070,138 @@ body[data-theme^="light"] .gantt-bar {
 body[data-theme^="light"] .gantt-slack-bar {
     background: rgba(30, 64, 175, 0.04);
 }
+
+/* Probabilistic Completion CSS */
+.probability-container {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr;
+    gap: 2rem;
+    align-items: center;
+    margin-top: 1.5rem;
+    margin-bottom: 1.5rem;
+}
+
+.probability-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+}
+
+.probability-stats {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 0.8rem;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+body[data-theme^="light"] .probability-stats {
+    background: rgba(15, 23, 42, 0.02);
+}
+
+.prob-stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+}
+
+.prob-stat-row span {
+    color: var(--text-secondary);
+}
+
+.prob-stat-row strong {
+    color: var(--text-primary);
+}
+
+.probability-gauge-wrapper {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.probability-gauge {
+    position: relative;
+    width: 160px;
+    height: 160px;
+}
+
+.gauge-svg {
+    width: 100%;
+    height: 100%;
+    transform: rotate(-90deg);
+}
+
+.gauge-bg {
+    fill: none;
+    stroke: var(--border-color);
+    stroke-width: 8;
+}
+
+.gauge-fill {
+    fill: none;
+    stroke: var(--accent-color);
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 251.2;
+    stroke-dashoffset: 251.2;
+    transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.gauge-text-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 10px;
+}
+
+.gauge-value {
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--accent-color);
+    line-height: 1.2;
+}
+
+.gauge-label {
+    font-size: 0.65rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+    margin-top: 4px;
+}
+
+.normal-curve-wrapper {
+    width: 100%;
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(255, 255, 255, 0.01);
+    border: 1px solid var(--border-color);
+    border-radius: 0.8rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+body[data-theme^="light"] .normal-curve-wrapper {
+    background: rgba(15, 23, 42, 0.01);
+}
+
+#normal-curve-canvas {
+    max-width: 100%;
+    height: auto;
+}
+
+@media (max-width: 768px) {
+    .probability-container {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
+    }
+}

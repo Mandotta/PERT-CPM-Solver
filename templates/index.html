@@ -129,6 +129,10 @@
                         Path</span>
                     <span id="critical-path-list" class="stat-value" style="font-size: 1.2rem;">-</span>
                 </div>
+                <div class="stat-card">
+                    <span style="color: var(--text-secondary); font-size: 0.8rem; text-transform: uppercase;">Project Std Dev (σ)</span>
+                    <span id="project-std-dev" class="stat-value">0</span>
+                </div>
             </div>
 
             <div class="glass-card">
@@ -139,6 +143,7 @@
                             <tr>
                                 <th>Activity</th>
                                 <th>TE</th>
+                                <th>Variance (σ²)</th>
                                 <th>ES</th>
                                 <th>EF</th>
                                 <th>LS</th>
@@ -166,6 +171,48 @@
                     <img id="graph-img" src="" alt="Network Diagram">
                 </div>
             </div>
+
+            <div class="glass-card" id="probabilistic-card">
+                <h3>Probabilistic Completion Analysis (PERT)</h3>
+                <div class="probability-container">
+                    <div class="probability-inputs">
+                        <div class="form-group">
+                            <label for="target-date-input" style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 0.5rem; display: block;">Target Completion Date (days):</label>
+                            <input type="number" id="target-date-input" min="0" step="0.5" class="form-control" placeholder="e.g. 20">
+                        </div>
+                        <div class="probability-stats">
+                            <div class="prob-stat-row">
+                                <span>Expected Duration ($T_E$):</span>
+                                <strong id="prob-expected-duration">-</strong>
+                            </div>
+                            <div class="prob-stat-row">
+                                <span>Project Std Dev ($\sigma_P$):</span>
+                                <strong id="prob-std-dev">-</strong>
+                            </div>
+                            <div class="prob-stat-row">
+                                <span>Z-Score:</span>
+                                <strong id="prob-z-score">-</strong>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="probability-gauge-wrapper">
+                        <div class="probability-gauge">
+                            <svg class="gauge-svg" viewBox="0 0 100 100">
+                                <circle class="gauge-bg" cx="50" cy="50" r="40"></circle>
+                                <circle class="gauge-fill" id="gauge-fill-circle" cx="50" cy="50" r="40"></circle>
+                            </svg>
+                            <div class="gauge-text-container">
+                                <span id="gauge-probability-value" class="gauge-value">0%</span>
+                                <span class="gauge-label">Probability of Completion</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Shaded Normal Curve visualization -->
+                <div class="normal-curve-wrapper">
+                    <canvas id="normal-curve-canvas" width="600" height="150"></canvas>
+                </div>
+            </div>
         </section>
     </div>
 
@@ -181,9 +228,9 @@
                     <button class="tab-btn active" data-tab="arch">💻 Architecture</button>
                     <button class="tab-btn" data-tab="math">📐 Scheduling Math</button>
                     <button class="tab-btn" data-tab="ux">🎨 UI/UX & Themes</button>
-                    <button class="tab-btn" data-tab="gaps">⚠️ Technical Gaps</button>
+                    <button class="tab-btn" data-tab="gaps">📊 Advanced Analytics</button>
                     <button class="tab-btn" data-tab="roadmap">🚀 Roadmap</button>
-                    <button class="tab-btn" data-tab="dev">👤 Developer Profile</button>
+                    <button class="tab-btn" data-tab="dev">🎓 Academic & Team Profile</button>
                 </div>
                 <div class="modal-main">
                     <!-- Tab: Architecture -->
@@ -257,6 +304,18 @@
                                 successor start.
                                 <br><span class="math-formula">FF(i) = min( ES(s) ) - EF(i)</span>
                             </li>
+                            <li>
+                                <strong>Activity Variance ($\sigma^2$):</strong> Measure of duration uncertainty.
+                                <br><span class="math-formula">$\sigma^2 = ((b - a) / 6)^2$</span>
+                            </li>
+                            <li>
+                                <strong>Project Standard Deviation ($\sigma_P$):</strong>
+                                <br><span class="math-formula">$\sigma_P = \sqrt{\sum \sigma^2 \text{ (on critical chain)}}$</span>
+                            </li>
+                            <li>
+                                <strong>Probability Z-Score ($Z$):</strong> Target date ($D$) evaluation.
+                                <br><span class="math-formula">$Z = (D - T_E) / \sigma_P$</span>
+                            </li>
                         </ul>
                     </div>
 
@@ -284,20 +343,17 @@
                         </div>
                     </div>
 
-                    <!-- Tab: Gaps -->
+                    <!-- Tab: Advanced Analytics -->
                     <div id="tab-gaps" class="tab-content">
-                        <h3>Critical Gaps & Probabilistic Capabilities</h3>
-                        <p>The application currently focuses on the expected durations ($T_E$) and critical paths, but
-                            lacks the core probabilistic analytics that PERT is built for:</p>
+                        <h3>Probabilistic Capabilities (PERT)</h3>
+                        <p>The application fully supports advanced probabilistic analytics that standard CPM lacks. By leveraging statistical modeling, it dynamically assesses project completion uncertainties:</p>
 
-                        <div class="highlight-box" style="border-left-color: var(--critical-color);">
-                            <strong>Missing Analytic Elements:</strong>
+                        <div class="highlight-box" style="border-left-color: var(--accent-color);">
+                            <strong>Implemented Analytic Elements:</strong>
                             <ul>
-                                <li><strong>Activity Variance ($\sigma^2$):</strong> $\sigma^2 = ((b - a) / 6)^2$</li>
-                                <li><strong>Project Standard Deviation ($\sigma_P$):</strong> Calculated as the square
-                                    root of the sum of variances of activities along the critical path.</li>
-                                <li><strong>Completion Probability:</strong> An interface requesting target completion
-                                    dates ($D$) to compute the normal-curve Z-score probability $P(T \le D)$.</li>
+                                <li><strong>Activity Variance ($\sigma^2$):</strong> Computed individually for each node to track estimation uncertainty.</li>
+                                <li><strong>Project Standard Deviation ($\sigma_P$):</strong> Extracted by tracing a unified critical chain to determine total systemic risk.</li>
+                                <li><strong>Interactive Completion Probability:</strong> A fluid graphical interface evaluating target completion dates ($D$) utilizing high-precision JavaScript normal-curve CDF algorithms.</li>
                             </ul>
                         </div>
                     </div>
@@ -326,23 +382,38 @@
                                 HTML5 GPS tracking, and day/night conditional weather via Open-Meteo.
                             </li>
                             <li>
-                                <strong>Phase 5: Probabilistic PERT Solver</strong>
-                                <br>Build variance calculations and target date completion gauges.
+                                <strong>Phase 5: Probabilistic PERT Solver (Completed)</strong>
+                                <br>Built variance calculations, interactive Z-score modeling, and canvas-rendered normal distribution gauges.
                             </li>
                         </ul>
                     </div>
 
                     <!-- Tab: Developer -->
                     <div id="tab-dev" class="tab-content">
-                        <h3>Developer & Academic Profile</h3>
+                        <h3>Academic & Team Profile</h3>
                         <p>This Decision Support System (DSS) was designed and implemented as part of academic research
                             and course requirements in operations research and project scheduling optimization.</p>
 
+                        <h3 style="margin-top: 1.5rem; margin-bottom: 1rem; font-size: 1.2rem;">Academic Supervision</h3>
+                        <div class="developer-card">
+                            <div class="profile-avatar" style="background: linear-gradient(135deg, var(--accent-color), #2563eb);">SE</div>
+                            <div class="profile-info">
+                                <h4>Dr. Salwa Elsayed</h4>
+                                <p class="profile-role">Project Supervisor</p>
+                                <ul class="profile-details">
+                                    <li><strong>Department:</strong> Decision Support (DS) Department</li>
+                                    <li><strong>Course/Specialization:</strong> Advanced Project Management</li>
+                                    <li><strong>University:</strong> Zagazig University</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-top: 2rem; margin-bottom: 1rem; font-size: 1.2rem;">System Architect & Developer</h3>
                         <div class="developer-card">
                             <div class="profile-avatar">MA</div>
                             <div class="profile-info">
                                 <h4>Mohamed Ayman Hamid Mahdi</h4>
-                                <p class="profile-role">Lead System Architect & Developer</p>
+                                <p class="profile-role">Lead System Architect</p>
                                 <ul class="profile-details">
                                     <li><strong>Grade:</strong> Grade 4</li>
                                     <li><strong>Department:</strong> Decision Support Department</li>

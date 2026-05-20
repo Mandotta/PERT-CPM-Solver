@@ -200,10 +200,12 @@ def calculate_cpm(activities):
         m = float(act['m'])
         b = float(act['b'])
         te = (a + 4*m + b) / 6
+        var = ((b - a) / 6) ** 2
         
         node_data[name] = {
             'name': name,
             'te': round(te, 2),
+            'var': round(var, 4),
             'preds': [p.strip() for p in act['pred'].split(',') if p.strip()],
             'es': 0, 'ef': 0, 'ls': 0, 'lf': 0, 'tf': 0, 'ff': 0
         }
@@ -254,9 +256,24 @@ def calculate_cpm(activities):
         else:
             data['ff'] = round(min(node_data[s]['es'] for s in successors) - data['ef'], 2)
 
-    critical_path = [name for name, d in node_data.items() if d['tf'] == 0]
+    critical_nodes = {name for name, d in node_data.items() if d['tf'] == 0}
+    critical_chain = []
+    if critical_nodes:
+        starts = [n for n in critical_nodes if not any(p in critical_nodes for p in G.predecessors(n))]
+        curr = min(starts, key=lambda n: node_data[n]['es']) if starts else list(critical_nodes)[0]
+        critical_chain.append(curr)
+        while True:
+            succs = [s for s in G.successors(curr) if s in critical_nodes]
+            if not succs: break
+            curr = min(succs, key=lambda s: abs(node_data[s]['es'] - node_data[curr]['ef']))
+            critical_chain.append(curr)
+
+    project_variance = sum(node_data[n]['var'] for n in critical_chain)
+    project_std = round(project_variance ** 0.5, 4)
+
+    critical_path = list(critical_nodes)
     
-    return list(node_data.values()), critical_path, project_duration, G
+    return list(node_data.values()), critical_path, project_duration, G, project_std
 
 def generate_graph_base64(G, node_data, critical_path, theme='dark-slate'):
     theme_configs = {
@@ -458,7 +475,7 @@ def solve():
             activities = data_json.get('activities', [])
             theme = data_json.get('theme', 'dark-slate')
 
-        results, cp, duration, G = calculate_cpm(activities)
+        results, cp, duration, G, project_std = calculate_cpm(activities)
         
         # Map node_data for graph gen convenience
         node_map = {r['name']: r for r in results}
@@ -469,6 +486,7 @@ def solve():
             'result': results,
             'critical_path': cp,
             'duration': duration,
+            'project_std': project_std,
             'graph': f"data:image/png;base64,{graph_b64}"
         })
     except Exception as e:

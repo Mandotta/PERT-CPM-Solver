@@ -202,10 +202,176 @@ document.addEventListener('DOMContentLoaded', () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
+    // --- Probabilistic PERT Analytics ---
+    let currentProjectDuration = 0;
+    let currentProjectStdDev = 0;
+
+    function normalCDF(z) {
+        if (z < -8.0) return 0.0;
+        if (z > 8.0) return 1.0;
+        const t = 1.0 / (1.0 + 0.2316419 * Math.abs(z));
+        const d = 0.3989422804; // 1 / sqrt(2 * pi)
+        const prob = 1.0 - d * Math.exp(-z * z / 2.0) * t * (
+            0.319381530 + t * (
+                -0.356563782 + t * (
+                    1.781477937 + t * (
+                        -1.821255978 + t * 1.330274429
+                    )
+                )
+            )
+        );
+        return z >= 0 ? prob : 1.0 - prob;
+    }
+
+    function updateProbabilisticView(targetDate) {
+        const expectedEl = document.getElementById('prob-expected-duration');
+        const stdEl = document.getElementById('prob-std-dev');
+        const zscoreEl = document.getElementById('prob-z-score');
+        const gaugeValEl = document.getElementById('gauge-probability-value');
+        const gaugeFill = document.getElementById('gauge-fill-circle');
+
+        if (!currentProjectStdDev || currentProjectStdDev === 0) {
+            zscoreEl.innerText = 'N/A';
+            gaugeValEl.innerText = '0%';
+            gaugeFill.style.strokeDashoffset = 251.2;
+            drawNormalCurve(currentProjectDuration, currentProjectStdDev, targetDate, 0);
+            return;
+        }
+
+        expectedEl.innerText = currentProjectDuration;
+        stdEl.innerText = currentProjectStdDev;
+
+        const z = (targetDate - currentProjectDuration) / currentProjectStdDev;
+        zscoreEl.innerText = z.toFixed(2);
+
+        const prob = normalCDF(z);
+        const probPercent = (prob * 100).toFixed(1);
+        
+        // Update Gauge
+        gaugeValEl.innerText = `${probPercent}%`;
+        const offset = 251.2 - (prob * 251.2);
+        gaugeFill.style.strokeDashoffset = offset;
+
+        // Draw Bell Curve
+        drawNormalCurve(currentProjectDuration, currentProjectStdDev, targetDate, prob);
+    }
+
+    function drawNormalCurve(mean, std, target, prob) {
+        const canvas = document.getElementById('normal-curve-canvas');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const w = canvas.width;
+        const h = canvas.height;
+
+        ctx.clearRect(0, 0, w, h);
+
+        if (!std || std === 0) return;
+
+        // Extract colors from computed styles for theme sync
+        const style = getComputedStyle(document.body);
+        const accentColor = style.getPropertyValue('--accent-color').trim() || '#38bdf8';
+        const textColor = style.getPropertyValue('--text-primary').trim() || '#f8fafc';
+        const borderColor = style.getPropertyValue('--border-color').trim() || '#1e293b';
+
+        // Range: mean ± 4 standard deviations
+        const minX = mean - 4 * std;
+        const maxX = mean + 4 * std;
+
+        // Normal PDF function
+        const pdf = (x) => Math.exp(-0.5 * Math.pow((x - mean) / std, 2)) / (std * Math.sqrt(2 * Math.PI));
+
+        // Find max Y for scaling
+        const maxY = pdf(mean);
+
+        // Map data coordinates to canvas coordinates
+        const mapX = (x) => ((x - minX) / (maxX - minX)) * w;
+        const mapY = (y) => h - (y / maxY) * (h - 20) - 10;
+
+        // 1. Draw Shaded Area (P(x <= target))
+        ctx.beginPath();
+        ctx.moveTo(mapX(minX), mapY(0));
+        for (let x = minX; x <= target && x <= maxX; x += (maxX - minX) / 200) {
+            ctx.lineTo(mapX(x), mapY(pdf(x)));
+        }
+        ctx.lineTo(mapX(Math.min(target, maxX)), mapY(0));
+        ctx.closePath();
+        ctx.fillStyle = accentColor;
+        ctx.globalAlpha = 0.3;
+        ctx.fill();
+        ctx.globalAlpha = 1.0;
+
+        // 2. Draw Bell Curve Line
+        ctx.beginPath();
+        for (let x = minX; x <= maxX; x += (maxX - minX) / 200) {
+            ctx.lineTo(mapX(x), mapY(pdf(x)));
+        }
+        ctx.strokeStyle = accentColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        // 3. Draw Mean Line
+        ctx.beginPath();
+        ctx.moveTo(mapX(mean), mapY(0));
+        ctx.lineTo(mapX(mean), mapY(maxY));
+        ctx.strokeStyle = borderColor;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // 4. Draw Target Line
+        if (target >= minX && target <= maxX) {
+            ctx.beginPath();
+            ctx.moveTo(mapX(target), mapY(0));
+            ctx.lineTo(mapX(target), mapY(pdf(target)));
+            ctx.strokeStyle = textColor;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw text
+            ctx.fillStyle = textColor;
+            ctx.font = '12px Inter, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(`Target: ${target}`, mapX(target), mapY(pdf(target)) - 5);
+        }
+
+        // Draw baseline
+        ctx.beginPath();
+        ctx.moveTo(0, h - 10);
+        ctx.lineTo(w, h - 10);
+        ctx.strokeStyle = borderColor;
+        ctx.stroke();
+        
+        // Draw mean text
+        ctx.fillStyle = textColor;
+        ctx.font = '12px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`μ = ${mean}`, mapX(mean), h);
+    }
+
+    document.getElementById('target-date-input').addEventListener('input', (e) => {
+        if (!currentProjectDuration) return;
+        const target = parseFloat(e.target.value);
+        if (!isNaN(target)) {
+            updateProbabilisticView(target);
+        }
+    });
+
     function renderResults(data) {
         // Stats
         document.getElementById('total-duration').innerText = data.duration;
         document.getElementById('critical-path-list').innerText = data.critical_path.join(' → ');
+        
+        const projectStdDevEl = document.getElementById('project-std-dev');
+        if (projectStdDevEl) projectStdDevEl.innerText = data.project_std || '0';
+
+        // Init prob values
+        currentProjectDuration = parseFloat(data.duration);
+        currentProjectStdDev = parseFloat(data.project_std || 0);
+
+        const targetInput = document.getElementById('target-date-input');
+        if (!targetInput.value) targetInput.value = currentProjectDuration;
+        
+        updateProbabilisticView(parseFloat(targetInput.value));
 
         // Table
         const tbody = document.getElementById('results-body');
@@ -219,6 +385,7 @@ document.addEventListener('DOMContentLoaded', () => {
             tr.innerHTML = `
                 <td><strong>${row.name}</strong></td>
                 <td>${row.te}</td>
+                <td>${row.var !== undefined ? row.var : '-'}</td>
                 <td>${row.es}</td>
                 <td>${row.ef}</td>
                 <td>${row.ls}</td>
